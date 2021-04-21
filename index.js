@@ -25,23 +25,16 @@ client.connect(err => {
     const servicesCollection = client.db("abshipgroup").collection("services");
     const adminsCollection = client.db("abshipgroup").collection("admins");
     const commentsCollection = client.db("abshipgroup").collection("comments");
+    const bookingsCollection = client.db("abshipgroup").collection("bookings");
 
     app.post('/addService', (req, res) => {
         const service = req.body;
-        const bgImage = req.files.bgImage;
-        const icon = req.files.icon;
         const name = service.name;
         const desc = service.desc;
-        const newBgImage = bgImage.data;
+        const bgImage = service.bgImage;
+        const icon = req.files.icon;
         const newIcon = icon.data;
-        const encBgImage = newBgImage.toString('base64');
         const encIcon = newIcon.toString('base64');
-
-        var bgImg = {
-            contentType: bgImage.mimetype,
-            size: bgImage.size,
-            img: Buffer.from(encBgImage, 'base64')
-        };
 
         var iconImg = {
             contentType: icon.mimetype,
@@ -49,7 +42,7 @@ client.connect(err => {
             img: Buffer.from(encIcon, 'base64')
         };
 
-        servicesCollection.insertOne({name, desc, bgImg, iconImg})
+        servicesCollection.insertOne({name, desc, bgImage, iconImg})
             .then(result => {
                 res.send(result.insertedCount > 0)
             })
@@ -62,9 +55,14 @@ client.connect(err => {
             })
     })
 
+    app.get('/service/:id', (req, res) => {
+        servicesCollection.find({_id: ObjectID(req.params.id)})
+            .toArray((err, documents) => {
+                res.send(documents);
+            })
+    })
+
     app.delete('/deleteService/:id', (req, res) => {
-        console.log('service id: ')
-        console.log(req.params.id)
         servicesCollection.deleteOne({ _id: ObjectID(req.params.id) })
             .then(result => res.send(result.deletedCount > 0))
     })
@@ -76,6 +74,21 @@ client.connect(err => {
         adminsCollection.insertOne({ name, email })
             .then(result => {
                 res.send(result.insertedCount > 0);
+            })
+    })
+
+    app.get('/admins', (req, res) => {
+        adminsCollection.find({})
+            .toArray((err, admins) => {
+                res.send(admins);
+            })
+    });
+
+    app.post('/isAdmin', (req, res) => {
+        const email = req.body.emailID;
+        adminsCollection.find({ email: email })
+            .toArray((err, admins) => {
+                res.send(admins.length > 0);
             })
     })
 
@@ -109,36 +122,37 @@ client.connect(err => {
             })
     })
 
-    app.post('/appointmentsByDate', (req, res) => {
-        const date = req.body;
-        const email = req.body.email;
-        doctorCollection.find({ email: email })
-            .toArray((err, doctors) => {
-                const filter = { date: date.date }
-                if (doctors.length === 0) {
-                    filter.email = email;
-                }
-                appointmentCollection.find(filter)
-                    .toArray((err, documents) => {
-                        console.log(email, date.date, doctors, documents)
-                        res.send(documents);
-                    })
+    app.post('/bookService', (req, res) => {
+        bookingsCollection.insertOne(req.body)
+            .then(result => {
+                res.send(result.insertedCount > 0);
             })
     })
 
-    app.get('/doctors', (req, res) => {
-        doctorCollection.find({})
+    app.get('/bookings', (req, res) => {
+        bookingsCollection.find({})
             .toArray((err, documents) => {
                 res.send(documents);
             })
-    });
+    })
 
-    app.post('/isDoctor', (req, res) => {
-        const email = req.body.email;
-        doctorCollection.find({ email: email })
-            .toArray((err, doctors) => {
-                res.send(doctors.length > 0);
+    app.get('/bookingsByClient/:email', (req, res) => {
+        const email = req.params.email;
+        console.log(email)
+        bookingsCollection.find({ "user.email": email })
+            .toArray((err, bookings) => {
+                res.send(bookings);
             })
+    })
+
+    // crud update
+    app.patch('/update/:id', (req, res) => {
+        bookingsCollection.updateOne({ _id: ObjectID(req.params.id) },
+            {
+                $set: { status: req.body.updatedStatus }
+            }
+        )
+            .then(result => res.send(result.modifiedCount > 0))
     })
 
 });
